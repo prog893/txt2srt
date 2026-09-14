@@ -154,7 +154,7 @@ def main(argv=None) -> int:
     for path in written:
         print(path)
     if args.report:
-        print(report.render(report.build(wav, cue_list, times)))
+        print(report.render(report.build(wav, cue_list, times, max_dur=args.max_dur)))
     return 0
 
 

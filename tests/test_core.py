@@ -161,3 +161,18 @@ def test_bare_invocation_prints_usage(capsys):
     out = capsys.readouterr().out
     assert "usage: txt2srt" in out
     assert "-t" in out and "-a" in out
+
+
+def test_report_counts_long_cues_against_the_limit_it_was_given(tmp_path):
+    """--max-dur says how long a cue may be. A report that grades against some
+    other number is answering a question nobody asked."""
+    from txt2srt import report
+
+    doc = transcript.parse(write(tmp_path, "A:\nあいうえお\n"))
+    t = Times.empty(len(doc.stream), "test")
+    t.set(0, len(doc.stream), 0.0, 5.0, 0.9)
+    t.fill_gaps()
+    built = cues.build(doc, t, max_dur=99.0)
+    audio = np.zeros(16000 * 10, dtype=np.float32)
+    assert report.build(audio, built, t, max_dur=6.0)["over_max_dur"] == 0
+    assert report.build(audio, built, t, max_dur=4.0)["over_max_dur"] == 1
