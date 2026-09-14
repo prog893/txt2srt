@@ -69,7 +69,7 @@ def main(argv=None) -> int:
         return 2
     from . import audio as audio_mod
     from . import cues as cues_mod
-    from . import inputs, outputs, report, timecode, transcript
+    from . import inputs, outputs, report, speech, timecode, transcript
 
     try:
         media, script = inputs.resolve(text=args.text, audio=args.audio)
@@ -90,12 +90,18 @@ def main(argv=None) -> int:
     say = (lambda m: print(m, flush=True)) if args.verbose else (lambda m: None)
     say(f"[{time.time()-t0:5.1f}s] {len(doc.lines)} lines, {len(doc.stream)} chars, {dur/60:.1f} min audio")
 
+    heard = speech.detect(wav)
+    say(f"[{time.time()-t0:5.1f}s] {len(heard.regions())} speech regions, "
+        f"{heard.cum[-1]/60:.1f} min of speech in {dur/60:.1f} min of audio")
+
     from .backends import align
     opts = {"lang": args.lang, "verbose": args.verbose}
     if args.model:
         opts["model"] = args.model
-    times = align(args.backend, wav, doc, **opts)
+    times = align(args.backend, wav, doc, speech=heard, **opts)
     say(f"[{time.time()-t0:5.1f}s] aligned with {args.backend}: {times.timed}/{len(doc.stream)} characters")
+    if times.clamped:
+        say(f"[{time.time()-t0:5.1f}s] pulled {times.clamped} word starts out of a pause they did not occupy")
 
     cue_list = cues_mod.build(doc, times, mode=args.cues, target=args.target, hard=args.hard,
                               max_dur=args.max_dur, gap_split=args.gap_split,
@@ -103,7 +109,7 @@ def main(argv=None) -> int:
     if not cue_list:
         raise SystemExit("no cues were produced")
     if not args.no_snap:
-        moved = cues_mod.snap(cue_list, wav, window=args.snap_window)
+        moved = cues_mod.snap(cue_list, heard, window=args.snap_window)
         say(f"[{time.time()-t0:5.1f}s] snapped {moved}/{len(cue_list)} cue starts to a speech onset")
     overlaps = cues_mod.enforce_gaps(cue_list)
     if overlaps:
@@ -154,7 +160,7 @@ def main(argv=None) -> int:
     for path in written:
         print(path)
     if args.report:
-        print(report.render(report.build(wav, cue_list, times)))
+        print(report.render(report.build(heard, cue_list, times)))
     return 0
 
 

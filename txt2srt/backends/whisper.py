@@ -58,7 +58,7 @@ PREPEND = "\"'“¿([{-"
 APPEND = "\"'.。,，!！?？:：”)]}、"
 
 
-def align(audio: np.ndarray, doc: Doc, *, model: str = DEFAULT_MODEL,
+def align(audio: np.ndarray, doc: Doc, *, speech, model: str = DEFAULT_MODEL,
           lang: str = "ja", verbose: bool = False, **_) -> Times:
     import mlx.core as mx
     from mlx_whisper.audio import (HOP_LENGTH, N_FRAMES, N_SAMPLES, SAMPLE_RATE,
@@ -71,16 +71,7 @@ def align(audio: np.ndarray, doc: Doc, *, model: str = DEFAULT_MODEL,
     tok = get_tokenizer(net.is_multilingual, num_languages=net.num_languages,
                         language=lang, task="transcribe")
 
-    from ..audio import envelope, speech_mask
-
-    mask = speech_mask(envelope(audio))
-    speech_cum = np.concatenate([[0.0], np.cumsum(mask) * 0.02])
-
-    def speech_between(t0: float, t1: float) -> float:
-        i = min(max(int(t0 / 0.02), 0), len(speech_cum) - 1)
-        j = min(max(int(t1 / 0.02), 0), len(speech_cum) - 1)
-        return float(speech_cum[j] - speech_cum[i])
-
+    speech_between = speech.seconds_between
     stream = doc.stream
     times = Times.empty(len(stream), "whisper", model)
     window_s = N_SAMPLES / SAMPLE_RATE

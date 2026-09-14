@@ -170,23 +170,16 @@ def _by_time(line: Line, a: int, b: int, times: Times, max_dur: float, gap_split
     return out
 
 
-def snap(cues: list[Cue], audio, window: float = 0.35, margin_db: float = 12.0) -> int:
+def snap(cues: list[Cue], speech, window: float = 0.35) -> int:
     """Pull cue boundaries onto the nearest speech onset.
 
     Cross-attention DTW (the whisper backend) tends to start a word slightly
-    before it is spoken, consistently by a few hundred milliseconds. The audio
+    before it is spoken, consistently by a few hundred milliseconds. The VAD
     knows better: if a speech onset is within `window` of where a cue starts,
-    that onset is where the cue starts. Never moves a boundary past a neighbour,
-    and never invents one where the energy is flat.
+    that onset is where the cue starts. Never moves a boundary past a
+    neighbour, and never invents one where nobody is speaking.
     """
-    from .audio import envelope, speech_mask
-
-    db = envelope(audio)
-    mask = speech_mask(db, margin_db)
-    if mask.size == 0:
-        return 0
-    onsets = np.flatnonzero(mask[1:] & ~mask[:-1]) * 0.02
-    offsets = np.flatnonzero(~mask[1:] & mask[:-1]) * 0.02
+    onsets, offsets = speech.onsets, speech.offsets
     if onsets.size == 0:
         return 0
     moved = 0

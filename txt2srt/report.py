@@ -2,22 +2,20 @@
 
 An aligner always returns something: forced alignment has no failure mode where
 it declines to answer, so a wrong answer looks exactly like a right one. The
-cheapest independent check is the audio's own energy. If a cue starts where
-nobody has started speaking, the number here moves, and it moves before anyone
-watches an hour of subtitles to notice.
+independent check is the VAD, which the aligner's own decisions never touch. If
+a cue starts where nobody is speaking, the number here moves, and it moves
+before anyone watches an hour of subtitles to notice.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from .audio import envelope, speech_mask
 from .cues import text_weight
 
 
-def build(audio, cues, times, *, pre: float = 0.1, post: float = 0.3,
+def build(speech, cues, times, *, pre: float = 0.1, post: float = 0.3,
           max_cps: float = 20.0) -> dict:
-    db = envelope(audio)
-    mask = speech_mask(db)
+    mask = speech.mask
     n = len(mask)
 
     def frame(t: float) -> int:

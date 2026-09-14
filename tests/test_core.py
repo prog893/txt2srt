@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from txt2srt import cues, transcript
-from txt2srt.backends import Times
+from txt2srt import speech
+from txt2srt.backends import Times, clamp_spans
 from txt2srt.timecode import format_tc, parse_tc, srt_time
 
 
@@ -161,3 +162,65 @@ def test_bare_invocation_prints_usage(capsys):
     out = capsys.readouterr().out
     assert "usage: txt2srt" in out
     assert "-t" in out and "-a" in out
+
+
+def tone(seconds: float, sr: int = 16000):
+    """Something the VAD will call speech: a voiced buzz, not white noise."""
+    t = np.arange(int(seconds * sr)) / sr
+    f0 = 120.0
+    wave = sum(np.sin(2 * np.pi * f0 * k * t) / k for k in range(1, 12))
+    env = 0.5 + 0.5 * np.sin(2 * np.pi * 4.0 * t)       # syllable-rate modulation
+    return (0.3 * wave * env).astype(np.float32)
+
+
+def quiet(seconds: float, sr: int = 16000):
+    return np.random.default_rng(0).normal(0, 1e-4, int(seconds * sr)).astype(np.float32)
+
+
+def test_the_vad_finds_speech_and_nothing_else():
+    audio = np.concatenate([quiet(2.0), tone(2.0), quiet(2.0)])
+    heard = speech.detect(audio)
+    assert heard.fraction_between(0.0, 1.8) == 0.0
+    assert heard.fraction_between(2.3, 3.7) > 0.9
+    assert heard.fraction_between(4.5, 6.0) == 0.0
+    assert 1.8 < heard.onsets[0] < 2.4
+    assert 3.8 < heard.offsets[0] < 4.4
+
+
+def test_a_word_does_not_keep_the_pause_in_front_of_it(tmp_path):
+    """DTW charges a pause to the word after it. The word's end is right, its
+    start is wherever the silence began, and the cue follows the start."""
+    doc = transcript.parse(write(tmp_path, "A:\nあい\n"))
+    audio = np.concatenate([quiet(10.0), tone(1.0)])
+    heard = speech.detect(audio)
+    t = Times.empty(len(doc.stream), "test")
+    t.set(0, 1, 0.2, 10.5, 0.9)          # 'あ' handed the whole 10s pause
+    t.set(1, 2, 10.5, 10.9, 0.9)
+    assert clamp_spans(t, doc, heard) == 1
+    assert t.end[0] == 10.5              # the end is where it was really said
+    assert 9.5 < t.start[0] <= 10.45     # the start is now the speech onset
+    t.fill_gaps()
+    assert cues.build(doc, t)[0].start > 9.0
+
+
+def test_a_word_spoken_slowly_is_left_alone(tmp_path):
+    doc = transcript.parse(write(tmp_path, "A:\nあい\n"))
+    heard = speech.detect(np.concatenate([quiet(0.2), tone(2.0)]))
+    t = Times.empty(len(doc.stream), "test")
+    t.set(0, 1, 0.3, 1.1, 0.9)
+    t.set(1, 2, 1.1, 1.9, 0.9)
+    assert clamp_spans(t, doc, heard) == 0
+    assert t.start[0] == 0.3
+
+
+def test_an_onset_is_not_trusted_past_what_a_word_could_take_to_say(tmp_path):
+    """A transcript is not an account of every sound in the room. Where the
+    speech a word ends inside began ten seconds earlier, because somebody
+    untranscribed was talking, the rate backstop is what bounds the cue."""
+    doc = transcript.parse(write(tmp_path, "A:\nあい\n"))
+    heard = speech.detect(np.concatenate([quiet(0.5), tone(10.0)]))
+    t = Times.empty(len(doc.stream), "test")
+    t.set(0, 1, 0.6, 10.2, 0.9)
+    t.set(1, 2, 10.2, 10.4, 0.9)
+    assert clamp_spans(t, doc, heard) == 1
+    assert t.start[0] > 8.5              # not the onset at 0.5s
