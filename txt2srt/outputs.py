@@ -8,9 +8,20 @@ from pathlib import Path
 import numpy as np
 
 from .cues import Cue, wrap
-from .timecode import srt_time, vtt_time
 
 FORMATS = ("srt", "vtt", "json", "csv", "text")
+
+
+def srt_time(seconds: float) -> str:
+    ms = int(round(max(0.0, seconds) * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def vtt_time(seconds: float) -> str:
+    return srt_time(seconds).replace(",", ".")
 
 
 def _label(cue: Cue, speakers: bool) -> str:
@@ -88,7 +99,7 @@ def write_json(doc, times, cues, path, *, backend: str, model: str, audio: str, 
 
 
 def write_text(doc, times, path, *, speakers=True):
-    """The transcript back out, unchanged, with a timecode per line. Sanity check
+    """The transcript back out, unchanged, with a timestamp per line. Sanity check
     that nothing was rewritten: diff it against the input."""
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         last = None

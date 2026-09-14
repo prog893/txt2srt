@@ -72,7 +72,6 @@ one paragraph per line. Blank lines are ignored.
 | `--cues line` | one cue per transcript line instead of subtitle-sized cues |
 | `--speakers` | put the speaker name in the cue text |
 | `--max-line 42` | wrap cue text at this width, over at most `--lines` lines |
-| `--start-tc 01:00:00:00` | shift every time by the recording's start timecode |
 | `-b vad` | align without a model, see below |
 | `--verbose` | progress while it runs |
 
@@ -89,7 +88,7 @@ Cue shaping has its own flags (`--target`, `--hard`, `--max-dur`, `--min-dur`,
 | `vtt` | the same, WebVTT |
 | `json` | every line and word with times, scores, and the source hash |
 | `csv` | one row per cue, for review in a spreadsheet |
-| `text` | the transcript back out, unchanged, with a timecode per line |
+| `text` | the transcript back out, unchanged, with a timestamp per line |
 
 ### `--report`
 

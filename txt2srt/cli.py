@@ -45,11 +45,6 @@ def build_parser() -> argparse.ArgumentParser:
                    help="do not pull cue boundaries onto nearby speech onsets")
     p.add_argument("--snap-window", type=float, default=0.75,
                    help="how far a boundary may be pulled to reach an onset (seconds)")
-    p.add_argument("--start-tc", default="",
-                   help="start timecode of the recording, e.g. 01:00:00:00. Shifts every "
-                        "written time by it, for an editor that expects source timecode")
-    p.add_argument("--fps", type=float, default=29.97,
-                   help="frame rate --start-tc is counted in (default: 29.97)")
     p.add_argument("--report", action="store_true",
                    help="check the cues against the recording's energy and print the numbers")
     p.add_argument("--verbose", action="store_true", help="print progress while aligning")
@@ -69,7 +64,7 @@ def main(argv=None) -> int:
         return 2
     from . import audio as audio_mod
     from . import cues as cues_mod
-    from . import inputs, outputs, report, timecode, transcript
+    from . import inputs, outputs, report, transcript
 
     try:
         media, script = inputs.resolve(text=args.text, audio=args.audio)
@@ -108,17 +103,6 @@ def main(argv=None) -> int:
     overlaps = cues_mod.enforce_gaps(cue_list)
     if overlaps:
         say(f"[{time.time()-t0:5.1f}s] separated {overlaps} overlapping cues")
-
-    # Everything written from here on is in the recording's timecode rather than
-    # in seconds from its start. Applied once, so every format agrees.
-    offset = timecode.parse_tc(args.start_tc, args.fps) if args.start_tc else 0.0
-    if offset:
-        times.start += offset
-        times.end += offset
-        for c in cue_list:
-            c.start += offset
-            c.end += offset
-        say(f"[{time.time()-t0:5.1f}s] shifted by {args.start_tc} ({offset:.3f}s)")
 
     out = inputs.output_path(args.output, media)
     out.parent.mkdir(parents=True, exist_ok=True)

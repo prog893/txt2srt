@@ -3,7 +3,7 @@ import pytest
 
 from txt2srt import cues, transcript
 from txt2srt.backends import Times
-from txt2srt.timecode import format_tc, parse_tc, srt_time
+from txt2srt.outputs import srt_time
 
 
 def write(tmp_path, text):
@@ -52,21 +52,6 @@ def test_cue_text_is_a_slice_of_the_source(tmp_path):
     assert "".join(c.text for c in built).replace(" ", "") == doc.stream.replace(" ", "")
     for c in built:
         assert c.text in doc.stream
-
-
-def test_timecode_round_trip():
-    for fps, tc in ((24.0, "01:02:03:04"), (25.0, "00:10:00:12"), (29.97, "00:10:00;02")):
-        assert format_tc(parse_tc(tc, fps), fps) == tc
-
-
-def test_drop_frame_labels_track_real_time():
-    # Drop-frame skips two labels at every minute except each tenth, so that
-    # timecode and wall clock agree at ten-minute marks. One minute of real time
-    # is 1798 frames, which is still labelled in the first minute; the labels
-    # 00:01:00;00 and ;01 are the ones that never appear.
-    assert format_tc(60.0, 29.97) == "00:00:59;28"
-    assert format_tc(1800 / 29.97, 29.97) == "00:01:00;02"
-    assert format_tc(600.0, 29.97) == "00:10:00;00"
 
 
 def test_srt_time():
