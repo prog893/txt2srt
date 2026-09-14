@@ -15,7 +15,7 @@ from .cues import text_weight
 
 
 def build(audio, cues, times, *, pre: float = 0.1, post: float = 0.3,
-          max_cps: float = 20.0) -> dict:
+          max_dur: float = 6.0, max_cps: float = 20.0) -> dict:
     db = envelope(audio)
     mask = speech_mask(db)
     n = len(mask)
@@ -52,7 +52,8 @@ def build(audio, cues, times, *, pre: float = 0.1, post: float = 0.3,
         "speech_covered": float((mask & covered).sum() / max(mask.sum(), 1)),
         "duration_p50": float(np.median(durations)) if len(durations) else 0.0,
         "duration_p95": float(np.percentile(durations, 95)) if len(durations) else 0.0,
-        "over_max_dur": int((durations > 6.0).sum()),
+        "max_dur": max_dur,
+        "over_max_dur": int((durations > max_dur).sum()),
         "over_max_cps": int((cps > max_cps).sum()),
         "overlaps": overlaps,
         "short": short,
@@ -71,7 +72,7 @@ def render(rep: dict) -> str:
         f"  end on speech       {rep['end_on_speech']*100:5.1f}%",
         f"  speech covered      {rep['speech_covered']*100:5.1f}%",
         f"  duration p50/p95    {rep['duration_p50']:.2f}s / {rep['duration_p95']:.2f}s",
-        f"  over 6s / over cps  {rep['over_max_dur']} / {rep['over_max_cps']}",
+        f"  over {rep['max_dur']:g}s / over cps  {rep['over_max_dur']} / {rep['over_max_cps']}",
         f"  overlapping cues    {rep['overlaps']}",
         f"  under 0.3s          {rep['short']}",
     ]
