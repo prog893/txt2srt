@@ -25,6 +25,11 @@ dependencies = [
     # Used by every backend for the emission/energy arrays. Capped for the same
     # reason as mlx-asr: mlx-whisper pulls numba, and numba caps numpy<2.5.
     "numpy<2.5",
+    # Runs the bundled Silero VAD weights. Speech detection is not optional:
+    # cue snapping, --report and the vad backend all rest on knowing where
+    # somebody is speaking, and an energy threshold does not know that. The CPU
+    # wheel is deliberate, for the same reason there is no torch here.
+    "onnxruntime>=1.16",
 ]
 
 [project.scripts]

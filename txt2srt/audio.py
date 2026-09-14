@@ -65,19 +65,3 @@ def duration(path: str) -> float:
         if stream is not None and stream.duration and stream.time_base:
             return float(stream.duration * stream.time_base)
         return float(container.duration or 0) / 1_000_000
-
-
-def envelope(audio: np.ndarray, hop: int = 320) -> np.ndarray:
-    """Frame RMS in dB, 20 ms hop. Used by the report and the vad backend."""
-    n = len(audio) // hop
-    if n == 0:
-        return np.zeros(0, dtype=np.float32)
-    rms = np.sqrt((audio[: n * hop].reshape(n, hop) ** 2).mean(1)) + 1e-9
-    return (20 * np.log10(rms)).astype(np.float32)
-
-
-def speech_mask(db: np.ndarray, margin_db: float = 12.0) -> np.ndarray:
-    """Frames above (10th-percentile noise floor + margin)."""
-    if db.size == 0:
-        return np.zeros(0, dtype=bool)
-    return db > (np.percentile(db, 10) + margin_db)

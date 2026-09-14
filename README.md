@@ -94,23 +94,34 @@ Cue shaping has its own flags (`--target`, `--hard`, `--max-dur`, `--min-dur`,
 ### `--report`
 
 Forced alignment always returns something, so a wrong result looks like a right
-one. `--report` grades the cues against the recording's energy, which the aligner
-never sees: what share of cues start and end where someone is actually speaking,
-how much of the speech the cues cover, and whether any overlap.
+one. `--report` grades the cues against the VAD, whose answer the aligner's own
+decisions never touch: what share of cues start and end where someone is
+actually speaking, how much of the speech the cues cover, and whether any
+overlap.
 
 ```
-  cues                 956
-  start on speech      92.3%
-  end on speech        96.4%
+  cues                943
+  start on speech      94.9%
+  end on speech        95.1%
+  speech covered       95.2%
   overlapping cues     0
 ```
+
+`speech covered` is the one to watch. The others grade each cue on its own, so
+an alignment that has slid off the audio entirely still passes them.
 
 ## Backends
 
 | `-b` | model | licence | notes |
 |---|---|---|---|
 | `whisper` (default) | `mlx-community/whisper-large-v3-turbo` | MIT, per its model card | Force-decodes the known text through Whisper and reads the timings out of cross-attention. Japanese and English in one pass. |
-| `vad` | none | n/a | Energy only: spreads the text across detected speech by how long each character takes to say. A draft to review, not a result. |
+| `vad` | none beyond the bundled VAD | n/a | No ASR: spreads the text across detected speech by how long each character takes to say. A draft to review, not a result. |
+
+Both first ask a voice activity detector where anybody is speaking at all. That
+answer decides where cue boundaries may move, what `--report` grades against,
+and which words the aligner is told have run into a pause. It is Silero VAD,
+MIT, 2.3 MB of ONNX weights carried inside the package, so there is nothing to
+download and no torch install. It costs about 11 seconds per hour of audio.
 
 ## Where the transcript comes from
 

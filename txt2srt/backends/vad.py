@@ -1,21 +1,19 @@
-"""Energy-VAD proportional alignment (--backend vad).
+"""Proportional alignment over detected speech (--backend vad).
 
-No model, no downloads, no licence question: speech regions are found by energy
-and the transcript is poured into them in proportion to how long each character
-takes to say. Cue boundaries land on real speech onsets, but which words are in
-which region is an assumption, so this is a draft to review, not a result. It
-exists for the cases where the model backends cannot run: no network, an
-unsupported language, or a machine without Metal.
+No ASR: speech regions come from the VAD and the transcript is poured into them
+in proportion to how long each character takes to say. Cue boundaries land on
+real speech onsets, but which words are in which region is an assumption, so
+this is a draft to review, not a result. It exists for the cases where the ASR
+backends cannot run: no Whisper weights, an unsupported language, or a machine
+without Metal.
 """
 from __future__ import annotations
 
 import numpy as np
 
-from ..audio import SAMPLE_RATE, envelope, speech_mask
+from ..audio import SAMPLE_RATE
 from ..transcript import Doc, alignable, is_japanese
 from . import Times
-
-HOP = 320                    # 20 ms
 
 
 def _weight(ch: str) -> float:
@@ -25,22 +23,8 @@ def _weight(ch: str) -> float:
     return 1.0 if is_japanese(ch) else 0.42
 
 
-def _regions(audio: np.ndarray, min_gap_s: float = 0.35, min_len_s: float = 0.15):
-    db = envelope(audio, HOP)
-    mask = speech_mask(db)
-    if not mask.any():
-        return [(0.0, len(audio) / SAMPLE_RATE)]
-    idx = np.flatnonzero(mask)
-    breaks = np.flatnonzero(np.diff(idx) > int(min_gap_s / 0.02))
-    starts = np.concatenate([[idx[0]], idx[breaks + 1]])
-    ends = np.concatenate([idx[breaks], [idx[-1]]])
-    out = [(s * 0.02, (e + 1) * 0.02) for s, e in zip(starts, ends)
-           if (e - s + 1) * 0.02 >= min_len_s]
-    return out or [(0.0, len(audio) / SAMPLE_RATE)]
-
-
-def align(audio: np.ndarray, doc: Doc, *, verbose: bool = False, **_) -> Times:
-    regions = _regions(audio)
+def align(audio: np.ndarray, doc: Doc, *, speech, verbose: bool = False, **_) -> Times:
+    regions = speech.regions() or [(0.0, len(audio) / SAMPLE_RATE)]
     total_speech = sum(e - s for s, e in regions)
     weights = np.array([_weight(c) for c in doc.stream], dtype=np.float64)
     total_weight = float(weights.sum()) or 1.0
